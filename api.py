@@ -12,6 +12,7 @@ from collections import defaultdict
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 
+
 class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
@@ -31,7 +32,7 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.wfile.write(b'Wrong API usage!')
                 return None
             k = path[1][2:]
-            response = self.get_recommendations_filter(str(sku), float(k))
+            response = get_recommendations_filter(str(sku), float(k))
             self.wfile.write(json.dumps(response).encode("utf-8"))
 
         # if no threshold given within the URL
@@ -41,35 +42,35 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
         else:
             self.wfile.write(b'Wrong API usage!')
 
+def load_csv(fname="recommends.csv"):
+    skus = defaultdict(list)
+    with open(fname, newline='') as f:
+        reader = csv.reader(f, delimiter=',', quoting=csv.QUOTE_NONE)
+        for row in reader:
+            skus[row[0]].append((row[1], float(row[2])))
+    print("Loaded csv data as dict.")
+    return skus
 
-class Api():
-    def __init__(self, fname="recommends.csv", port=8000, ip='localhost'):
-        self.skus = defaultdict(list)
-        self.ip = ip
-        self.port = port
-        self.fname = fname
-        print("Loading csv into memory as dict.")
-        self.load_csv()
-        print("Start serving API.")
-        self.httpd = HTTPServer((self.ip, self.port), SimpleHTTPRequestHandler)
-        self.httpd.serve_forever()
+def get_recommendations_filter(sku, k=False):
+    # if threshold is given
+    if k:
+        list_skus = skus[sku]
+        res = list(filter(lambda x: x[1] >= k, list_skus))
+        return res
+    else:
+        # no threshold given.
+        res = skus[sku]
+        return res
 
-    def load_csv(self):
-        with open(self.fname, newline='') as f:
-            reader = csv.reader(f, delimiter=',', quoting=csv.QUOTE_NONE)
-            for row in reader:
-                self.skus[row[0]].append((row[1], float(row[2])))
 
-    def get_recommendations_filter(self, sku, k=False):
-        # if threshold given
-        if k:
-            list_skus = skus[sku]
-            res = list(filter(lambda x: x[1] >= k, list_skus))
-            return res
-        else:
-            # no threshold given.
-            res = skus[sku]
-            return res
+
 if __name__ == "__main__":
-    api = Api()
-    #api = Api(ip="35.224.184.222", port=80)
+    skus = load_csv()
+    #ip="35.224.184.222"
+    ip="0.0.0.0"
+    port=8000
+    # ip = "localhost"
+    # port = 80
+    httpd = HTTPServer((ip, port), SimpleHTTPRequestHandler)
+    print("Started serving API.")
+    httpd.serve_forever()
